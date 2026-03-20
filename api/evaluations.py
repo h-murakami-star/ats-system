@@ -1,7 +1,7 @@
 import json
 from datetime import datetime
 from database import get_db
-from server import parse_json_body, get_pagination_params
+from server import parse_json_body, get_pagination_params, convert_keys_to_camel
 
 
 def register_routes(router):
@@ -13,44 +13,32 @@ def register_routes(router):
 
 
 def list_evaluations(request):
-    """GET /api/evaluations - List evaluations"""
+    """GET /api/evaluations - List evaluations by candidate"""
     conn = get_db()
     cursor = conn.cursor()
 
-    page, per_page = get_pagination_params(request['params'])
-
-    # Get total count
-    cursor.execute("SELECT COUNT(*) as count FROM evaluations")
-    total = cursor.fetchone()['count']
-
-    # Get evaluations
+    # Get unique candidates with their evaluations
     cursor.execute("""
-        SELECT e.*, i.application_id, a.candidate_id, c.name as candidate_name,
-               j.title as job_title
-        FROM evaluations e
-        JOIN interviews i ON e.interview_id = i.id
-        JOIN applications a ON i.application_id = a.id
-        JOIN candidates c ON a.candidate_id = c.id
-        JOIN jobs j ON a.job_id = j.id
-        ORDER BY e.created_at DESC
-        LIMIT ? OFFSET ?
-    """, (per_page, (page - 1) * per_page))
+        SELECT DISTINCT a.candidate_id as candidateId, c.name as candidateName,
+               AVG(e.overall_score) as averageScore
+        FROM candidates c
+        LEFT JOIN applications a ON c.id = a.candidate_id
+        LEFT JOIN interviews i ON a.id = i.application_id
+        LEFT JOIN evaluations e ON i.id = e.interview_id
+        GROUP BY a.candidate_id, c.name
+        ORDER BY c.created_at DESC
+    """)
 
     evaluations = [dict(row) for row in cursor.fetchall()]
 
     conn.close()
 
+    # Convert to camelCase and return as array
+    evaluations = convert_keys_to_camel(evaluations)
+
     return {
         'status': 200,
-        'data': {
-            'evaluations': evaluations,
-            'pagination': {
-                'page': page,
-                'per_page': per_page,
-                'total': total,
-                'pages': (total + per_page - 1) // per_page
-            }
-        }
+        'data': evaluations
     }
 
 

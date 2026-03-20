@@ -1,7 +1,7 @@
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
 from database import get_db
-from server import parse_json_body, get_pagination_params
+from server import parse_json_body, get_pagination_params, convert_keys_to_camel
 
 
 def register_routes(router):
@@ -228,55 +228,42 @@ def update_application(request):
 
 
 def get_pipeline(request):
-    """GET /api/pipeline - Get pipeline view grouped by stage with counts"""
+    """GET /api/pipeline - Get pipeline applications with candidates and jobs"""
     conn = get_db()
     cursor = conn.cursor()
 
-    # Get pipeline data
+    # Get applications with candidate and job details
     cursor.execute("""
-        SELECT stage, COUNT(*) as count, status
-        FROM applications
-        GROUP BY stage, status
-        ORDER BY CASE stage
-            WHEN 'applied' THEN 1
-            WHEN 'document_screening' THEN 2
-            WHEN 'first_interview' THEN 3
-            WHEN 'second_interview' THEN 4
-            WHEN 'final_interview' THEN 5
-            WHEN 'offer' THEN 6
-            WHEN 'hired' THEN 7
-            WHEN 'rejected' THEN 8
-            ELSE 9
-        END, status
+        SELECT a.id, a.job_id as jobId, a.candidate_id as candidateId, a.status, a.stage,
+               a.applied_at as createdAt, a.updated_at as updatedAt,
+               c.name as candidateName, j.title as jobTitle
+        FROM applications a
+        JOIN candidates c ON a.candidate_id = c.id
+        JOIN jobs j ON a.job_id = j.id
+        ORDER BY a.applied_at DESC
     """)
 
-    pipeline_data = {}
+    applications = []
     for row in cursor.fetchall():
-        stage = row['stage']
-        if stage not in pipeline_data:
-            pipeline_data[stage] = {'total': 0, 'by_status': {}}
-        pipeline_data[stage]['total'] += row['count']
-        pipeline_data[stage]['by_status'][row['status']] = row['count']
+        app = dict(row)
+        # Calculate days in current stage
+        created = datetime.fromisoformat(app['createdAt']) if app['createdAt'] else datetime.now()
+        days_in_stage = (datetime.now() - created).days
+        app['daysInStage'] = days_in_stage
 
-    # Get total funnel metrics
-    cursor.execute("""
-        SELECT
-            COUNT(DISTINCT CASE WHEN stage = 'applied' THEN 1 END) as total_applied,
-            COUNT(DISTINCT CASE WHEN stage IN ('document_screening', 'first_interview', 'second_interview', 'final_interview') THEN 1 END) as in_interview,
-            COUNT(DISTINCT CASE WHEN stage = 'offer' THEN 1 END) as offers,
-            COUNT(DISTINCT CASE WHEN stage = 'hired' THEN 1 END) as hired,
-            COUNT(DISTINCT CASE WHEN status = 'rejected' THEN 1 END) as rejected
-        FROM applications
-    """)
+        # Get candidate initials
+        candidate_name = app.get('candidateName', '')
+        initials = ''.join([name[0].upper() for name in candidate_name.split() if name])
+        app['candidateInitials'] = initials or 'U'
 
-    funnel = dict(cursor.fetchone())
+        applications.append(app)
 
     conn.close()
 
+    # Convert to camelCase and return as array
+    applications = convert_keys_to_camel(applications)
+
     return {
         'status': 200,
-        'data': {
-            'pipeline': pipeline_data,
-            'funnel': funnel
-        }
+        'data': applications
     }

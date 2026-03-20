@@ -1,7 +1,7 @@
 import json
 from datetime import datetime
 from database import get_db
-from server import parse_json_body, get_pagination_params
+from server import parse_json_body, get_pagination_params, convert_keys_to_camel
 
 
 def register_routes(router):
@@ -23,33 +23,33 @@ def list_jobs(request):
     status = request['params'].get('status', [None])[0]
     department = request['params'].get('department', [None])[0]
     search = request['params'].get('search', [None])[0]
-    page, per_page = get_pagination_params(request['params'])
 
-    # Build query
-    query = "SELECT * FROM jobs WHERE 1=1"
+    # Build query to get application counts
+    query = """
+        SELECT j.id, j.title, j.department, j.employment_type as type, j.location,
+               j.salary_min as salaryMin, j.salary_max as salaryMax,
+               j.description, j.requirements, j.status, j.created_at as createdAt,
+               COUNT(a.id) as applicationCount
+        FROM jobs j
+        LEFT JOIN applications a ON j.id = a.job_id
+        WHERE 1=1
+    """
     params = []
 
     if status:
-        query += " AND status = ?"
+        query += " AND j.status = ?"
         params.append(status)
 
     if department:
-        query += " AND department = ?"
+        query += " AND j.department = ?"
         params.append(department)
 
     if search:
-        query += " AND (title LIKE ? OR description LIKE ? OR requirements LIKE ?)"
+        query += " AND (j.title LIKE ? OR j.description LIKE ? OR j.requirements LIKE ?)"
         search_term = f"%{search}%"
         params.extend([search_term, search_term, search_term])
 
-    # Get total count
-    count_query = query.replace("SELECT *", "SELECT COUNT(*) as count")
-    cursor.execute(count_query, params)
-    total = cursor.fetchone()['count']
-
-    # Add pagination
-    query += " ORDER BY created_at DESC LIMIT ? OFFSET ?"
-    params.extend([per_page, (page - 1) * per_page])
+    query += " GROUP BY j.id ORDER BY j.created_at DESC"
 
     # Execute query
     cursor.execute(query, params)
@@ -57,17 +57,12 @@ def list_jobs(request):
 
     conn.close()
 
+    # Convert to camelCase and return as array in data
+    jobs = convert_keys_to_camel(jobs)
+
     return {
         'status': 200,
-        'data': {
-            'jobs': jobs,
-            'pagination': {
-                'page': page,
-                'per_page': per_page,
-                'total': total,
-                'pages': (total + per_page - 1) // per_page
-            }
-        }
+        'data': jobs
     }
 
 

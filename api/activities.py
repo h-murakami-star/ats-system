@@ -1,7 +1,7 @@
 import json
 from datetime import datetime
 from database import get_db
-from server import parse_json_body, get_pagination_params
+from server import parse_json_body, get_pagination_params, convert_keys_to_camel
 
 
 def register_routes(router):
@@ -18,10 +18,10 @@ def list_activities(request):
     # Get query parameters
     entity_type = request['params'].get('entity_type', [None])[0]
     action = request['params'].get('action', [None])[0]
-    page, per_page = get_pagination_params(request['params'])
+    limit = request['params'].get('limit', [None])[0]
 
     # Build query
-    query = "SELECT * FROM activities WHERE 1=1"
+    query = "SELECT id, entity_type, entity_id, action, description as title, description, created_at, user_name FROM activities WHERE 1=1"
     params = []
 
     if entity_type:
@@ -32,31 +32,29 @@ def list_activities(request):
         query += " AND action = ?"
         params.append(action)
 
-    # Get total count
-    count_query = query.replace("SELECT *", "SELECT COUNT(*) as count")
-    cursor.execute(count_query, params)
-    total = cursor.fetchone()['count']
+    # Add ordering
+    query += " ORDER BY created_at DESC"
 
-    # Add pagination and ordering
-    query += " ORDER BY created_at DESC LIMIT ? OFFSET ?"
-    params.extend([per_page, (page - 1) * per_page])
+    # Add limit if specified
+    if limit:
+        try:
+            limit_val = int(limit)
+            query += " LIMIT ?"
+            params.append(limit_val)
+        except (ValueError, TypeError):
+            pass
 
     cursor.execute(query, params)
     activities = [dict(row) for row in cursor.fetchall()]
 
     conn.close()
 
+    # Convert to camelCase and return as array
+    activities = convert_keys_to_camel(activities)
+
     return {
         'status': 200,
-        'data': {
-            'activities': activities,
-            'pagination': {
-                'page': page,
-                'per_page': per_page,
-                'total': total,
-                'pages': (total + per_page - 1) // per_page
-            }
-        }
+        'data': activities
     }
 
 

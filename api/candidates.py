@@ -1,7 +1,7 @@
 import json
 from datetime import datetime
 from database import get_db
-from server import parse_json_body, get_pagination_params
+from server import parse_json_body, get_pagination_params, convert_keys_to_camel
 
 
 def register_routes(router):
@@ -21,46 +21,42 @@ def list_candidates(request):
     # Get query parameters
     search = request['params'].get('search', [None])[0]
     source = request['params'].get('source', [None])[0]
-    page, per_page = get_pagination_params(request['params'])
 
-    # Build query
-    query = "SELECT * FROM candidates WHERE 1=1"
+    # Build query - need to get candidate status from their latest application
+    query = """
+        SELECT DISTINCT c.id, c.name, c.email, c.phone, c.source,
+               COALESCE(a.status, 'new') as status
+        FROM candidates c
+        LEFT JOIN (
+            SELECT candidate_id, status, ROW_NUMBER() OVER (PARTITION BY candidate_id ORDER BY applied_at DESC) as rn
+            FROM applications
+        ) a ON c.id = a.candidate_id AND a.rn = 1
+        WHERE 1=1
+    """
     params = []
 
     if search:
-        query += " AND (name LIKE ? OR email LIKE ? OR phone LIKE ?)"
+        query += " AND (c.name LIKE ? OR c.email LIKE ? OR c.phone LIKE ?)"
         search_term = f"%{search}%"
         params.extend([search_term, search_term, search_term])
 
     if source:
-        query += " AND source = ?"
+        query += " AND c.source = ?"
         params.append(source)
 
-    # Get total count
-    count_query = query.replace("SELECT *", "SELECT COUNT(*) as count")
-    cursor.execute(count_query, params)
-    total = cursor.fetchone()['count']
-
-    # Add pagination and ordering
-    query += " ORDER BY created_at DESC LIMIT ? OFFSET ?"
-    params.extend([per_page, (page - 1) * per_page])
+    query += " ORDER BY c.created_at DESC"
 
     cursor.execute(query, params)
     candidates = [dict(row) for row in cursor.fetchall()]
 
     conn.close()
 
+    # Convert to camelCase and return as array
+    candidates = convert_keys_to_camel(candidates)
+
     return {
         'status': 200,
-        'data': {
-            'candidates': candidates,
-            'pagination': {
-                'page': page,
-                'per_page': per_page,
-                'total': total,
-                'pages': (total + per_page - 1) // per_page
-            }
-        }
+        'data': candidates
     }
 
 

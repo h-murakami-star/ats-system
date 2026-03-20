@@ -15,57 +15,63 @@ def register_routes(router):
 
 def get_summary(request):
     """GET /api/reports/summary - Get hiring funnel summary"""
+    from datetime import datetime
     conn = get_db()
     cursor = conn.cursor()
 
-    # Get funnel metrics
-    cursor.execute("""
-        SELECT
-            COUNT(*) as total_candidates,
-            COUNT(DISTINCT CASE WHEN status IN ('screening', 'interview', 'offer', 'hired') THEN candidate_id END) as active_candidates,
-            COUNT(DISTINCT CASE WHEN status = 'hired' THEN candidate_id END) as hired,
-            COUNT(DISTINCT CASE WHEN status = 'rejected' THEN candidate_id END) as rejected
-        FROM applications
-    """)
-
-    funnel = dict(cursor.fetchone())
-
-    # Calculate conversion rates
-    if funnel['total_candidates'] > 0:
-        funnel['conversion_to_hired'] = round((funnel['hired'] / funnel['total_candidates']) * 100, 2)
-        funnel['conversion_to_active'] = round((funnel['active_candidates'] / funnel['total_candidates']) * 100, 2)
-    else:
-        funnel['conversion_to_hired'] = 0
-        funnel['conversion_to_active'] = 0
-
-    # Get open jobs count
-    cursor.execute("SELECT COUNT(*) as count FROM jobs WHERE status = 'open'")
-    open_jobs = cursor.fetchone()['count']
-
     # Get total jobs count
-    cursor.execute("SELECT COUNT(*) as count FROM jobs")
+    cursor.execute("SELECT COUNT(*) as count FROM jobs WHERE status = 'open'")
     total_jobs = cursor.fetchone()['count']
+
+    # Get total candidates count
+    cursor.execute("SELECT COUNT(DISTINCT candidate_id) as count FROM applications")
+    total_candidates = cursor.fetchone()['count']
+
+    # Get upcoming interviews count (status='scheduled' and scheduled_at > now)
+    cursor.execute("""
+        SELECT COUNT(*) as count FROM interviews
+        WHERE status = 'scheduled' AND scheduled_at > datetime('now')
+    """)
+    upcoming_interviews = cursor.fetchone()['count']
+
+    # Get monthly hires (status='hired' and updated this month)
+    cursor.execute("""
+        SELECT COUNT(*) as count FROM applications
+        WHERE status = 'hired' AND strftime('%Y-%m', updated_at) = strftime('%Y-%m', 'now')
+    """)
+    monthly_hires = cursor.fetchone()['count']
 
     conn.close()
 
     return {
         'status': 200,
         'data': {
-            'funnel': funnel,
-            'jobs': {
-                'open': open_jobs,
-                'total': total_jobs
-            }
+            'totalJobs': total_jobs,
+            'totalCandidates': total_candidates,
+            'upcomingInterviews': upcoming_interviews,
+            'monthlyHires': monthly_hires
         }
     }
 
 
 def get_pipeline_stats(request):
-    """GET /api/reports/pipeline - Get pipeline statistics"""
+    """GET /api/reports/funnel - Get pipeline funnel statistics"""
+    from datetime import datetime, timedelta
     conn = get_db()
     cursor = conn.cursor()
 
-    # Get stage distribution
+    # Map of stage names to Japanese display names
+    stage_labels = {
+        'applied': '応募',
+        'document_screening': '書類選考',
+        'first_interview': '一次面接',
+        'second_interview': '二次面接',
+        'final_interview': '最終面接',
+        'offer': '内定',
+        'hired': '採用'
+    }
+
+    # Get stage distribution (overall pipeline)
     cursor.execute("""
         SELECT stage, COUNT(*) as count
         FROM applications
@@ -83,28 +89,51 @@ def get_pipeline_stats(request):
         END
     """)
 
-    stages = {}
+    pipeline = {}
     for row in cursor.fetchall():
-        stages[row['stage']] = row['count']
+        stage = row['stage']
+        if stage in stage_labels:
+            pipeline[stage_labels[stage]] = row['count']
 
-    # Get status distribution
+    # Get this month's funnel data
+    current_month = datetime.now().strftime('%Y-%m')
+
     cursor.execute("""
-        SELECT status, COUNT(*) as count
+        SELECT stage, COUNT(*) as count
         FROM applications
-        GROUP BY status
-    """)
+        WHERE strftime('%Y-%m', applied_at) = ?
+        GROUP BY stage
+    """, (current_month,))
 
-    statuses = {}
+    this_month = {
+        'applications': 0,
+        'screening': 0,
+        'interviews': 0,
+        'offers': 0,
+        'hired': 0
+    }
+
     for row in cursor.fetchall():
-        statuses[row['status']] = row['count']
+        stage = row['stage']
+        count = row['count']
+        if stage == 'applied':
+            this_month['applications'] = count
+        elif stage == 'document_screening':
+            this_month['screening'] = count
+        elif stage in ('first_interview', 'second_interview', 'final_interview'):
+            this_month['interviews'] += count
+        elif stage == 'offer':
+            this_month['offers'] = count
+        elif stage == 'hired':
+            this_month['hired'] = count
 
     conn.close()
 
     return {
         'status': 200,
         'data': {
-            'stages': stages,
-            'statuses': statuses
+            'pipeline': pipeline,
+            'thisMonth': this_month
         }
     }
 

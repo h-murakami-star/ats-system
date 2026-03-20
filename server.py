@@ -173,6 +173,21 @@ def parse_json_body(body):
         return {}
 
 
+def to_camel_case(snake_str):
+    """Convert snake_case string to camelCase"""
+    components = snake_str.split('_')
+    return components[0] + ''.join(x.title() for x in components[1:])
+
+
+def convert_keys_to_camel(obj):
+    """Recursively convert dictionary keys from snake_case to camelCase"""
+    if isinstance(obj, list):
+        return [convert_keys_to_camel(item) for item in obj]
+    elif isinstance(obj, dict):
+        return {to_camel_case(k): convert_keys_to_camel(v) for k, v in obj.items()}
+    return obj
+
+
 def get_pagination_params(params):
     """Extract pagination parameters from query string"""
     page = int(params.get('page', ['1'])[0])

@@ -1,6 +1,6 @@
 import json
 from database import get_db
-from server import parse_json_body
+from server import parse_json_body, convert_keys_to_camel
 
 
 def register_routes(router):
@@ -19,9 +19,10 @@ def get_departments(request):
     """GET /api/settings/departments"""
     conn = get_db()
     cursor = conn.cursor()
-    cursor.execute("SELECT id, name, created_at FROM departments ORDER BY name")
+    cursor.execute("SELECT id, name, created_at as createdAt FROM departments ORDER BY name")
     departments = [dict(row) for row in cursor.fetchall()]
     conn.close()
+    departments = convert_keys_to_camel(departments)
     return {'status': 200, 'data': departments}
 
 
@@ -76,9 +77,10 @@ def get_stages(request):
     """GET /api/settings/stages"""
     conn = get_db()
     cursor = conn.cursor()
-    cursor.execute("SELECT id, name, display_name, sort_order, is_active FROM selection_stages ORDER BY sort_order")
+    cursor.execute("SELECT id, name, display_name as displayName, sort_order as sortOrder, is_active as isActive FROM selection_stages ORDER BY sort_order")
     stages = [dict(row) for row in cursor.fetchall()]
     conn.close()
+    stages = convert_keys_to_camel(stages)
     return {'status': 200, 'data': stages}
 
 
@@ -134,17 +136,23 @@ def get_system_info(request):
     cursor = conn.cursor()
 
     counts = {}
-    for table in ['jobs', 'candidates', 'applications', 'interviews', 'evaluations', 'users']:
-        cursor.execute(f"SELECT COUNT(*) as count FROM {table}")
-        counts[table] = cursor.fetchone()['count']
+    for table in ['jobs', 'candidates', 'applications', 'interviews', 'evaluations']:
+        try:
+            cursor.execute(f"SELECT COUNT(*) as count FROM {table}")
+            counts[table] = cursor.fetchone()['count']
+        except:
+            counts[table] = 0
 
     conn.close()
+
+    data = {
+        'version': '1.0.0',
+        'systemName': '採用管理システム (ATS)',
+        'database': 'SQLite',
+        'counts': convert_keys_to_camel(counts)
+    }
+
     return {
         'status': 200,
-        'data': {
-            'version': '1.0.0',
-            'system_name': '採用管理システム (ATS)',
-            'database': 'SQLite',
-            'counts': counts
-        }
+        'data': data
     }

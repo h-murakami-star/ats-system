@@ -1,7 +1,7 @@
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
 from database import get_db
-from server import parse_json_body, get_pagination_params
+from server import parse_json_body, get_pagination_params, convert_keys_to_camel
 
 
 def register_routes(router):
@@ -21,12 +21,14 @@ def list_interviews(request):
     # Get query parameters
     start_date = request['params'].get('start_date', [None])[0]
     end_date = request['params'].get('end_date', [None])[0]
-    status = request['params'].get('status', [None])[0]
-    page, per_page = get_pagination_params(request['params'])
+    filter_param = request['params'].get('filter', [None])[0]
+    limit = request['params'].get('limit', [None])[0]
 
     # Build query
     query = """
-        SELECT i.*, a.candidate_id, c.name as candidate_name, j.title as job_title
+        SELECT i.id, i.application_id, i.scheduled_at as scheduledAt, i.interview_type as interviewType,
+               i.duration_minutes, i.location, i.notes, i.status,
+               c.name as candidateName, j.title as jobTitle
         FROM interviews i
         JOIN applications a ON i.application_id = a.id
         JOIN candidates c ON a.candidate_id = c.id
@@ -34,6 +36,10 @@ def list_interviews(request):
         WHERE 1=1
     """
     params = []
+
+    # Handle filter=upcoming
+    if filter_param == 'upcoming':
+        query += " AND i.status = 'scheduled' AND i.scheduled_at > datetime('now')"
 
     if start_date:
         query += " AND i.scheduled_at >= ?"
@@ -43,35 +49,29 @@ def list_interviews(request):
         query += " AND i.scheduled_at <= ?"
         params.append(end_date)
 
-    if status:
-        query += " AND i.status = ?"
-        params.append(status)
+    # Add ordering
+    query += " ORDER BY i.scheduled_at ASC"
 
-    # Get total count
-    count_query = query.replace("SELECT i.*", "SELECT COUNT(*) as count")
-    cursor.execute(count_query, params)
-    total = cursor.fetchone()['count']
-
-    # Add pagination and ordering
-    query += " ORDER BY i.scheduled_at ASC LIMIT ? OFFSET ?"
-    params.extend([per_page, (page - 1) * per_page])
+    # Add limit if specified
+    if limit:
+        try:
+            limit_val = int(limit)
+            query += " LIMIT ?"
+            params.append(limit_val)
+        except (ValueError, TypeError):
+            pass
 
     cursor.execute(query, params)
     interviews = [dict(row) for row in cursor.fetchall()]
 
     conn.close()
 
+    # Convert to camelCase and return as array
+    interviews = convert_keys_to_camel(interviews)
+
     return {
         'status': 200,
-        'data': {
-            'interviews': interviews,
-            'pagination': {
-                'page': page,
-                'per_page': per_page,
-                'total': total,
-                'pages': (total + per_page - 1) // per_page
-            }
-        }
+        'data': interviews
     }
 
 
