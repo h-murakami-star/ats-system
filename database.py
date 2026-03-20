@@ -127,6 +127,27 @@ def init_db():
         )
     """)
 
+    # Departments table
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS departments (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT UNIQUE NOT NULL,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
+    # Selection stages table
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS selection_stages (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            display_name TEXT NOT NULL,
+            sort_order INTEGER DEFAULT 0,
+            is_active INTEGER DEFAULT 1,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
     conn.commit()
     conn.close()
 
@@ -260,6 +281,25 @@ def seed_demo_data():
             INSERT INTO activities (entity_type, entity_id, action, description, user_name)
             VALUES (?, ?, ?, ?, ?)
         """, (entity_type, entity_id, action, desc, user))
+
+    # Seed departments
+    departments = ['人事', '開発', '営業', 'マーケティング', '経理', '総務']
+    for dept in departments:
+        cursor.execute("INSERT OR IGNORE INTO departments (name) VALUES (?)", (dept,))
+
+    # Seed selection stages
+    stages = [
+        ('applied', '応募', 1),
+        ('document_screening', '書類選考', 2),
+        ('first_interview', '一次面接', 3),
+        ('second_interview', '二次面接', 4),
+        ('final_interview', '最終面接', 5),
+        ('offer', '内定', 6),
+        ('hired', '採用', 7),
+    ]
+    for name, display_name, order in stages:
+        cursor.execute("INSERT OR IGNORE INTO selection_stages (name, display_name, sort_order) VALUES (?, ?, ?)",
+                       (name, display_name, order))
 
     conn.commit()
     conn.close()

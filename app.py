@@ -20,6 +20,7 @@ from api import interviews
 from api import evaluations
 from api import activities
 from api import reports
+from api import settings
 
 
 def main():
@@ -53,6 +54,7 @@ def main():
     evaluations.register_routes(router)
     activities.register_routes(router)
     reports.register_routes(router)
+    settings.register_routes(router)
 
     # Add health check endpoint
     def health_check(request):

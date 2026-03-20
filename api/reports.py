@@ -7,6 +7,7 @@ def register_routes(router):
     """Register report-related routes"""
     router.get(r'/api/reports/summary', get_summary)
     router.get(r'/api/reports/pipeline', get_pipeline_stats)
+    router.get(r'/api/reports/funnel', get_pipeline_stats)
     router.get(r'/api/reports/sources', get_sources_breakdown)
     router.get(r'/api/reports/time-to-hire', get_time_to_hire)
     router.get(r'/api/reports/department', get_department_breakdown)
