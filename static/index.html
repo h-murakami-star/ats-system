@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>採用管理システム</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <div class="sidebar-logo">
+                    <span class="logo-icon">🎯</span>
+                    <span class="logo-text">採用管理</span>
+                </div>
+                <button class="sidebar-toggle" aria-label="サイドバーを閉じる">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </button>
+            </div>
+
+            <nav class="sidebar-nav">
+                <ul>
+                    <li><a href="#/dashboard" class="nav-link" data-page="dashboard">
+                        <span class="nav-icon">📊</span>
+                        <span class="nav-text">ダッシュボード</span>
+                    </a></li>
+                    <li><a href="#/jobs" class="nav-link" data-page="jobs">
+                        <span class="nav-icon">📋</span>
+                        <span class="nav-text">求人管理</span>
+                    </a></li>
+                    <li><a href="#/candidates" class="nav-link" data-page="candidates">
+                        <span class="nav-icon">👥</span>
+                        <span class="nav-text">候補者管理</span>
+                    </a></li>
+                    <li><a href="#/pipeline" class="nav-link" data-page="pipeline">
+                        <span class="nav-icon">🔄</span>
+                        <span class="nav-text">選考パイプライン</span>
+                    </a></li>
+                    <li><a href="#/interviews" class="nav-link" data-page="interviews">
+                        <span class="nav-icon">🗓️</span>
+                        <span class="nav-text">面接管理</span>
+                    </a></li>
+                    <li><a href="#/evaluations" class="nav-link" data-page="evaluations">
+                        <span class="nav-icon">⭐</span>
+                        <span class="nav-text">評価シート</span>
+                    </a></li>
+                    <li><a href="#/reports" class="nav-link" data-page="reports">
+                        <span class="nav-icon">📈</span>
+                        <span class="nav-text">レポート</span>
+                    </a></li>
+                    <li><a href="#/settings" class="nav-link" data-page="settings">
+                        <span class="nav-icon">⚙️</span>
+                        <span class="nav-text">設定</span>
+                    </a></li>
+                </ul>
+            </nav>
+        </aside>
+
+        <!-- Main Content Area -->
+        <div class="main-wrapper">
+            <!-- Header -->
+            <header class="app-header">
+                <div class="header-left">
+                    <button class="menu-toggle" aria-label="メニュー">
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                    </button>
+                    <h1 class="system-title">採用管理システム</h1>
+                </div>
+                <div class="header-right">
+                    <div class="search-bar">
+                        <input type="text" placeholder="検索..." class="search-input" id="globalSearch">
+                        <span class="search-icon">🔍</span>
+                    </div>
+                    <div class="user-area">
+                        <button class="user-avatar">田</button>
+                        <div class="user-menu">
+                            <button class="menu-item">プロフィール</button>
+                            <button class="menu-item">ログアウト</button>
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Main Content -->
+            <main class="main-content">
+                <div id="page-container">
+                    <!-- Content will be loaded here by router -->
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <!-- Modals Container -->
+    <div id="modals-container"></div>
+
+    <!-- Toast Notifications -->
+    <div id="toast-container" class="toast-container"></div>
+
+    <!-- Scripts -->
+    <script src="js/app.js"></script>
+    <script src="js/dashboard.js"></script>
+    <script src="js/jobs.js"></script>
+    <script src="js/candidates.js"></script>
+    <script src="js/pipeline.js"></script>
+    <script src="js/interviews.js"></script>
+    <script src="js/evaluations.js"></script>
+    <script src="js/reports.js"></script>
+    <script src="js/settings.js"></script>
+</body>
+</html>

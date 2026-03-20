@@ -1,0 +1,16 @@
+__pycache__/
+*.pyc
+*.pyo
+ats.db
+*.db
+.DS_Store
+.env
+*.log
+COMPLETION_SUMMARY.md
+FILES_CREATED.txt
+FRONTEND_FILE_MANIFEST.txt
+FRONTEND_README.md
+FRONTEND_SUMMARY.md
+MANIFEST.txt
+PROJECT_STRUCTURE.md
+QUICKSTART.md
